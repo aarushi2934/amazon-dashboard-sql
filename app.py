@@ -139,14 +139,6 @@ st.sidebar.header("⚙️ Data Source")
 source_mode = st.sidebar.radio("Choose source", ["SQLite DB", "CSV upload"], index=0)
 
 db_path = st.sidebar.text_input("SQLite DB path", DB_PATH_DEFAULT)
-if source_mode == "SQLite DB":
-    col_seed = st.sidebar.container()
-    if col_seed.button("🔄 Seed / Reseed DB with sample data"):
-        try:
-            seed_sqlite(db_path)
-            st.sidebar.success(f"Database seeded at: {db_path}")
-        except Exception as e:
-            st.sidebar.error(f"Seeding failed: {e}")
 
 uploaded = None
 if source_mode == "CSV upload":
@@ -154,12 +146,52 @@ if source_mode == "CSV upload":
 
 # Load data
 if source_mode == "SQLite DB":
+    # Check if database exists and has data
+    db_exists = False
+    db_has_data = False
+    
+    try:
+        with sqlite3.connect(db_path) as conn:
+            cur = conn.cursor()
+            # Check if table exists
+            cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sku_metrics'")
+            if cur.fetchone():
+                # Check if table has data
+                cur.execute("SELECT COUNT(*) FROM sku_metrics")
+                count = cur.fetchone()[0]
+                if count > 0:
+                    db_has_data = True
+                db_exists = True
+    except Exception:
+        pass
+    
+    # Auto-seed if database doesn't exist or is empty
+    if not db_has_data:
+        try:
+            seed_sqlite(db_path)
+            db_has_data = True
+        except Exception as e:
+            st.error(f"Failed to initialize database: {e}")
+            st.stop()
+    
+    # Add button to refresh data (only show after initial load)
+    if db_has_data:
+        col_seed = st.sidebar.container()
+        if col_seed.button("🔄 Generate New Sample Data"):
+            try:
+                seed_sqlite(db_path)
+                st.sidebar.success("✓ New sample data generated")
+                st.rerun()
+            except Exception as e:
+                st.sidebar.error(f"Failed to generate data: {e}")
+    
+    # Load data from database
     try:
         with sqlite3.connect(db_path) as conn:
             df = pd.read_sql("SELECT * FROM sku_metrics", conn, parse_dates=["date"])
             df["date"] = df["date"].dt.date
     except Exception as e:
-        st.error(f"Could not read DB: {e}")
+        st.error(f"Error loading data: {e}")
         st.stop()
 else:
     if uploaded is not None:

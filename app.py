@@ -174,17 +174,6 @@ if source_mode == "SQLite DB":
             st.error(f"Failed to initialize database: {e}")
             st.stop()
     
-    # Add button to refresh data (only show after initial load)
-    if db_has_data:
-        col_seed = st.sidebar.container()
-        if col_seed.button("🔄 Generate New Sample Data"):
-            try:
-                seed_sqlite(db_path)
-                st.sidebar.success("✓ New sample data generated")
-                st.rerun()
-            except Exception as e:
-                st.sidebar.error(f"Failed to generate data: {e}")
-    
     # Load data from database
     try:
         with sqlite3.connect(db_path) as conn:
